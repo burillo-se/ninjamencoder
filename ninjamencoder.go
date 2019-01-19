@@ -143,17 +143,17 @@ func EncodeNinjamInterval(encoderParam *EncoderParam,
 	for p := 0; p < nPackets; p++ {
 		var ninjamPacket []byte
 
-		// deinterleave and analyze samples
-		samplesPerChunk := encoderParam.ChannelCount * encoderParam.ChunkSize
-		start := p * samplesPerChunk
-		end := intmin(len(samples), (p+1)*samplesPerChunk)
-		analyzeSamples(encoderParam, &vorbisParam, samples[start:end])
-
 		// if this is our first packet, initialize vorbis headers
 		if first {
 			ninjamPacket = initVorbisHeaders(encoderParam, &vorbisParam)
 			first = false
 		}
+
+		// deinterleave and analyze samples
+		samplesPerChunk := encoderParam.ChannelCount * encoderParam.ChunkSize
+		start := p * samplesPerChunk
+		end := intmin(len(samples), (p+1)*samplesPerChunk)
+		analyzeSamples(encoderParam, &vorbisParam, samples[start:end])
 
 		// encode our samples
 		endOfStream := false
