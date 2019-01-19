@@ -117,7 +117,7 @@ func initVorbisHeaders(encoderParam *EncoderParam, vorbisParam *vorbisParam) []b
 	return headers
 }
 
-// EncodeNinjamInterval will accept encoder parameters, NINJAM interval UUID
+// EncodeNinjamInterval will accept encoder parameters,
 // and an array of (interleaved) samples. Returns an array
 // of arrays of bytes, one array per each packet generated.
 func EncodeNinjamInterval(encoderParam *EncoderParam,
