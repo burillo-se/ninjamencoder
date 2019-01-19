@@ -42,17 +42,30 @@ func intmin(a int, b int) int {
 	return b
 }
 
+// this is totally going to work, pinky swear
 func getSamplePtr(data **float32, channelIndex int, sampleIndex int) *float32 {
-	// step 1 - get address of per-channelIndex array
-	channelSamplesBasePtr := unsafe.Pointer(data)
-	channelSamplesOffset := uintptr(channelIndex) * unsafe.Sizeof(*data)
-	channelSamplesPtr := unsafe.Pointer(uintptr(channelSamplesBasePtr) + channelSamplesOffset)
+	// &data[0]
+	basePtr := unsafe.Pointer(data)
+	// calculate offset to get from 0 to channelIndex
+	baseOffset := uintptr(channelIndex) * unsafe.Sizeof(*data)
+	// *(&data[channelIndex])
+	// adding offset to base will only get us &data[channelIndex], so we
+	// need an additional dereferencing to get to data[channelIndex]
+	samplesPtr := *(*uintptr)(unsafe.Pointer(uintptr(basePtr) + baseOffset))
 
-	// step 2 - get address of the actual sample
+	// we've blasted through one level of indirection, round two
+	// we start with &data[channelIndex][0]
+
+	// calculate offset to get from 0 to sampleIndex
 	sampleOffset := uintptr(sampleIndex) * unsafe.Sizeof(**data)
-	samplePtr := unsafe.Pointer(uintptr(channelSamplesPtr) + sampleOffset)
+	// &data[channelIndex][sampleIndex]
+	samplePtr := unsafe.Pointer(samplesPtr + sampleOffset)
 
-	// step 3 - return pointer for user to do as he pleases
+	// go vet says the above is misuse of unsafe pointers, but this is
+	// intentional - samplesPtr points to an address, so it needs
+	// dereferencing before we can add an offset
+
+	// (float*)&data[channelIndex][sampleIndex]
 	return (*float32)(samplePtr)
 }
 
