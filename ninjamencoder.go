@@ -8,11 +8,11 @@ import (
 
 // stuff internal to encoder that we need to pass around
 type vorbisParam struct {
-	Info        vorbis.Info
-	StreamState vorbis.OggStreamState
-	Comment     vorbis.Comment
-	DSPState    vorbis.DspState
-	Block       vorbis.Block
+	info        vorbis.Info
+	streamState vorbis.OggStreamState
+	comment     vorbis.Comment
+	dspState    vorbis.DspState
+	block       vorbis.Block
 }
 
 // Encoder parameters to use for vorbis encoder.
@@ -75,7 +75,7 @@ func (encoder *Encoder) analyzeSamples(samples []float32) {
 	// vorbis analysis buffer is managed by vorbis library
 	nFrames := len(samples) / encoder.ChannelCount
 
-	res := vorbis.AnalysisBuffer(&encoder.vorbis.DSPState, int32(nFrames))
+	res := vorbis.AnalysisBuffer(&encoder.vorbis.dspState, int32(nFrames))
 
 	for i := 0; i < nFrames; i++ {
 		for c := 0; c < encoder.ChannelCount; c++ {
@@ -88,39 +88,39 @@ func (encoder *Encoder) analyzeSamples(samples []float32) {
 	}
 
 	// notify vorbis that we've wrote the analysis buffer
-	vorbis.AnalysisWrote(&encoder.vorbis.DSPState, int32(nFrames))
+	vorbis.AnalysisWrote(&encoder.vorbis.dspState, int32(nFrames))
 }
 
 func (encoder *Encoder) initVorbisHeaders() []byte {
 	var headers []byte
-	vorbis.InfoInit(&encoder.vorbis.Info)
-	vorbis.EncodeInitVbr(&encoder.vorbis.Info,
+	vorbis.InfoInit(&encoder.vorbis.info)
+	vorbis.EncodeInitVbr(&encoder.vorbis.info,
 		encoder.ChannelCount,
 		encoder.SampleRate,
 		encoder.Quality)
 
-	vorbis.CommentInit(&encoder.vorbis.Comment)
-	vorbis.CommentAddTag(&encoder.vorbis.Comment, "Encoder", "guitar-jam.ru")
+	vorbis.CommentInit(&encoder.vorbis.comment)
+	vorbis.CommentAddTag(&encoder.vorbis.comment, "Encoder", "guitar-jam.ru")
 
-	vorbis.AnalysisInit(&encoder.vorbis.DSPState, &encoder.vorbis.Info)
-	vorbis.BlockInit(&encoder.vorbis.DSPState, &encoder.vorbis.Block)
+	vorbis.AnalysisInit(&encoder.vorbis.dspState, &encoder.vorbis.info)
+	vorbis.BlockInit(&encoder.vorbis.dspState, &encoder.vorbis.block)
 
-	vorbis.OggStreamInit(&encoder.vorbis.StreamState, 0)
+	vorbis.OggStreamInit(&encoder.vorbis.streamState, 0)
 
 	var header vorbis.OggPacket
 	headerComm := make([]vorbis.OggPacket, 1)
 	headerCode := make([]vorbis.OggPacket, 1)
 
-	vorbis.AnalysisHeaderout(&encoder.vorbis.DSPState, &encoder.vorbis.Comment,
+	vorbis.AnalysisHeaderout(&encoder.vorbis.dspState, &encoder.vorbis.comment,
 		&header, headerComm, headerCode)
 
-	vorbis.OggStreamPacketin(&encoder.vorbis.StreamState, &header)
-	vorbis.OggStreamPacketin(&encoder.vorbis.StreamState, &headerComm[0])
-	vorbis.OggStreamPacketin(&encoder.vorbis.StreamState, &headerCode[0])
+	vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &header)
+	vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerComm[0])
+	vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerCode[0])
 
 	for {
 		var page vorbis.OggPage
-		result := vorbis.OggStreamFlush(&encoder.vorbis.StreamState, &page)
+		result := vorbis.OggStreamFlush(&encoder.vorbis.streamState, &page)
 		if result == 0 {
 			break
 		}
@@ -132,11 +132,11 @@ func (encoder *Encoder) initVorbisHeaders() []byte {
 }
 
 func (encoder *Encoder) clearVorbisHeaders() {
-	vorbis.OggStreamClear(&encoder.vorbis.StreamState)
-	vorbis.BlockClear(&encoder.vorbis.Block)
-	vorbis.DspClear(&encoder.vorbis.DSPState)
-	vorbis.CommentClear(&encoder.vorbis.Comment)
-	vorbis.InfoClear(&encoder.vorbis.Info)
+	vorbis.OggStreamClear(&encoder.vorbis.streamState)
+	vorbis.BlockClear(&encoder.vorbis.block)
+	vorbis.DspClear(&encoder.vorbis.dspState)
+	vorbis.CommentClear(&encoder.vorbis.comment)
+	vorbis.InfoClear(&encoder.vorbis.info)
 }
 
 // EncodeNinjamInterval will accept an array of (interleaved) samples.
@@ -163,18 +163,18 @@ func (encoder *Encoder) EncodeNinjamInterval(samples []float32) [][]byte {
 
 		// encode our samples
 		endOfStream := false
-		for vorbis.AnalysisBlockout(&encoder.vorbis.DSPState, &encoder.vorbis.Block) != 0 {
-			vorbis.Analysis(&encoder.vorbis.Block, nil)
-			vorbis.BitrateAddblock(&encoder.vorbis.Block)
+		for vorbis.AnalysisBlockout(&encoder.vorbis.dspState, &encoder.vorbis.block) != 0 {
+			vorbis.Analysis(&encoder.vorbis.block, nil)
+			vorbis.BitrateAddblock(&encoder.vorbis.block)
 
 			var packet vorbis.OggPacket
 
-			for vorbis.BitrateFlushpacket(&encoder.vorbis.DSPState, &packet) != 0 {
-				vorbis.OggStreamPacketin(&encoder.vorbis.StreamState, &packet)
+			for vorbis.BitrateFlushpacket(&encoder.vorbis.dspState, &packet) != 0 {
+				vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &packet)
 				for endOfStream == false {
 					var page vorbis.OggPage
 
-					if vorbis.OggStreamFlush(&encoder.vorbis.StreamState, &page) == 0 {
+					if vorbis.OggStreamFlush(&encoder.vorbis.streamState, &page) == 0 {
 						break
 					}
 
