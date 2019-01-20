@@ -3,7 +3,7 @@ package ninjamencoder
 import (
 	"unsafe"
 
-	"github.com/burillo-se/vorbis-go/vorbis"
+	"github.com/xlab/vorbis-go/vorbis"
 )
 
 // stuff internal to encoder that we need to pass around
