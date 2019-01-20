@@ -36,7 +36,7 @@ func NewEncoderParam() *EncoderParam {
 
 // generics ftw
 func intmin(a int, b int) int {
-	if a > b {
+	if a < b {
 		return a
 	}
 	return b
