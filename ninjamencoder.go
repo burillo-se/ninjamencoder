@@ -15,18 +15,18 @@ type vorbisParam struct {
 	Block       vorbis.Block
 }
 
-// EncoderParam parameters to use for vorbis encoder.
-type EncoderParam struct {
+// Encoder parameters to use for vorbis encoder.
+type Encoder struct {
 	ChannelCount int     // number of audio channels to encode
 	SampleRate   int     // audio sample rate
 	ChunkSize    int     // number of frames in a single packet
 	Quality      float32 // vorbis encoder quality
 }
 
-// NewEncoderParam creates a new EncoderParam struct with sensible default values:
+// NewEncoder creates a new Encoder struct with sensible default values:
 // stereo 44.1kHz, chunk size set to 8K frames, quality set to 0.1
-func NewEncoderParam() *EncoderParam {
-	return &EncoderParam{
+func NewEncoder() *Encoder {
+	return &Encoder{
 		2,     // default to stereo
 		44100, // default to 44.1kHz sample rate
 		8192,  // default to splitting interval into packets 8K frames each
@@ -69,16 +69,15 @@ func getSamplePtr(data **float32, channelIndex int, sampleIndex int) *float32 {
 	return (*float32)(samplePtr)
 }
 
-func analyzeSamples(encoderParam *EncoderParam,
-	vorbisParam *vorbisParam, samples []float32) {
+func (encoder *Encoder) analyzeSamples(vorbisParam *vorbisParam, samples []float32) {
 	// vorbis analysis buffer is managed by vorbis library
-	nFrames := len(samples) / encoderParam.ChannelCount
+	nFrames := len(samples) / encoder.ChannelCount
 
 	res := vorbis.AnalysisBuffer(&vorbisParam.DSPState, int32(nFrames))
 
 	for i := 0; i < nFrames; i++ {
-		for c := 0; c < encoderParam.ChannelCount; c++ {
-			sampleIndex := i*encoderParam.ChannelCount + c
+		for c := 0; c < encoder.ChannelCount; c++ {
+			sampleIndex := i*encoder.ChannelCount + c
 
 			// get a ptr to sample value, and write it
 			samplePtr := getSamplePtr(res, c, i)
@@ -90,13 +89,13 @@ func analyzeSamples(encoderParam *EncoderParam,
 	vorbis.AnalysisWrote(&vorbisParam.DSPState, int32(nFrames))
 }
 
-func initVorbisHeaders(encoderParam *EncoderParam, vorbisParam *vorbisParam) []byte {
+func (encoder *Encoder) initVorbisHeaders(vorbisParam *vorbisParam) []byte {
 	var headers []byte
 	vorbis.InfoInit(&vorbisParam.Info)
 	vorbis.EncodeInitVbr(&vorbisParam.Info,
-		encoderParam.ChannelCount,
-		encoderParam.SampleRate,
-		encoderParam.Quality)
+		encoder.ChannelCount,
+		encoder.SampleRate,
+		encoder.Quality)
 
 	vorbis.CommentInit(&vorbisParam.Comment)
 	vorbis.CommentAddTag(&vorbisParam.Comment, "Encoder", "guitar-jam.ru")
@@ -130,14 +129,12 @@ func initVorbisHeaders(encoderParam *EncoderParam, vorbisParam *vorbisParam) []b
 	return headers
 }
 
-// EncodeNinjamInterval will accept encoder parameters,
-// and an array of (interleaved) samples. Returns an array
-// of arrays of bytes, one array per each packet generated.
-func EncodeNinjamInterval(encoderParam *EncoderParam,
-	samples []float32) [][]byte {
+// EncodeNinjamInterval will accept an array of (interleaved) samples.
+// Returns an array of arrays of bytes, one array per each packet generated.
+func (encoder *Encoder) EncodeNinjamInterval(samples []float32) [][]byte {
 	var vorbisParam vorbisParam
 	first := true
-	nPackets := len(samples) / encoderParam.ChannelCount / encoderParam.ChunkSize
+	nPackets := len(samples) / encoder.ChannelCount / encoder.ChunkSize
 	res := make([][]byte, nPackets)
 
 	for p := 0; p < nPackets; p++ {
@@ -145,15 +142,15 @@ func EncodeNinjamInterval(encoderParam *EncoderParam,
 
 		// if this is our first packet, initialize vorbis headers
 		if first {
-			ninjamPacket = initVorbisHeaders(encoderParam, &vorbisParam)
+			ninjamPacket = encoder.initVorbisHeaders(&vorbisParam)
 			first = false
 		}
 
 		// deinterleave and analyze samples
-		samplesPerChunk := encoderParam.ChannelCount * encoderParam.ChunkSize
+		samplesPerChunk := encoder.ChannelCount * encoder.ChunkSize
 		start := p * samplesPerChunk
 		end := intmin(len(samples), (p+1)*samplesPerChunk)
-		analyzeSamples(encoderParam, &vorbisParam, samples[start:end])
+		encoder.analyzeSamples(&vorbisParam, samples[start:end])
 
 		// encode our samples
 		endOfStream := false
