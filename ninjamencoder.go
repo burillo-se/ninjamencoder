@@ -3,6 +3,8 @@ package ninjamencoder
 import (
 	"unsafe"
 
+	"fmt"
+
 	"github.com/xlab/vorbis-go/vorbis"
 )
 
@@ -42,6 +44,25 @@ func intmin(a int, b int) int {
 		return a
 	}
 	return b
+}
+
+func DeinterleaveSamples(samples []float32, channelCount int) ([][]float32, error) {
+	nFrames := len(samples) / channelCount
+
+	if len(samples) != (nFrames * channelCount) {
+		return nil, fmt.Errorf("Invalid number of samples")
+	}
+
+	res := make([][]float32, channelCount)
+	for c := 0; c < channelCount; c++ {
+		res[c] = make([]float32, nFrames)
+
+		for f := 0; f < nFrames; f++ {
+			// not terribly cache efficient but oh well
+			res[c][f] = samples[f * channelCount + c]
+		}
+	}
+	return res, nil
 }
 
 // this is totally going to work, pinky swear
