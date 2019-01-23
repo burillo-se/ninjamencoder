@@ -164,7 +164,13 @@ func (encoder *Encoder) clearVorbisHeaders() {
 // Returns an array of arrays of bytes, one array per each packet generated.
 func (encoder *Encoder) EncodeNinjamInterval(samples []float32) [][]byte {
 	first := true
-	nPackets := len(samples) / encoder.ChannelCount / encoder.ChunkSize
+	bufLen := len(samples) / encoder.ChannelCount
+	extra := (bufLen % encoder.ChunkSize) > 0
+	nPackets := bufLen / encoder.ChunkSize
+	if extra {
+		nPackets += 1
+	}
+
 	res := make([][]byte, nPackets)
 
 	for p := 0; p < nPackets; p++ {
