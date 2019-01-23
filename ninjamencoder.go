@@ -6,7 +6,11 @@ import (
 	"fmt"
 
 	"github.com/xlab/vorbis-go/vorbis"
+
+	logrus "github.com/sirupsen/logrus"
 )
+
+var log = logrus.New()
 
 // stuff internal to encoder that we need to pass around
 type vorbisParam struct {
@@ -98,6 +102,8 @@ func (encoder *Encoder) analyzeSamples(samples [][]float32) {
 
 	res := vorbis.AnalysisBuffer(&encoder.vorbis.dspState, int32(nFrames))
 
+	log.Debugf("Analyzing %v frames", nFrames)
+
 	for i := 0; i < nFrames; i++ {
 		for c := 0; c < encoder.ChannelCount; c++ {
 			// get a ptr to sample value, and write it
@@ -112,6 +118,9 @@ func (encoder *Encoder) analyzeSamples(samples [][]float32) {
 
 func (encoder *Encoder) initVorbisHeaders() []byte {
 	var headers []byte
+
+	log.Debug("Initializing vorbis headers")
+
 	vorbis.InfoInit(&encoder.vorbis.info)
 	vorbis.EncodeInitVbr(&encoder.vorbis.info,
 		encoder.ChannelCount,
@@ -141,16 +150,20 @@ func (encoder *Encoder) initVorbisHeaders() []byte {
 		var page vorbis.OggPage
 		result := vorbis.OggStreamFlush(&encoder.vorbis.streamState, &page)
 		if result == 0 {
+			log.Debug("Stream write complete")
 			break
 		}
 		headers = append(headers, page.Header...)
 		headers = append(headers, page.Body...)
+
+		log.Debugf("Appending %v bytes to headers", len(page.Header) + len(page.Body))
 	}
 
 	return headers
 }
 
 func (encoder *Encoder) clearVorbisHeaders() {
+	log.Debug("Clearing vorbis encoder state")
 	vorbis.OggStreamClear(&encoder.vorbis.streamState)
 	vorbis.BlockClear(&encoder.vorbis.block)
 	vorbis.DspClear(&encoder.vorbis.dspState)
@@ -186,9 +199,13 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 	for p := 0; p < nPackets; p++ {
 		var ninjamPacket []byte
 
+		log.Debug("Creating Ogg packet %v", p)
+
 		// if this is our first packet, initialize vorbis headers
 		if first {
+			log.Debug("First packet")
 			ninjamPacket = encoder.initVorbisHeaders()
+			log.Debugf("Appended %v bytes to packet", len(ninjamPacket))
 			first = false
 		}
 
@@ -201,6 +218,8 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 		}
 		encoder.analyzeSamples(buf)
 
+		log.Debug("Analysis complete, encoding stream")
+
 		// encode our samples
 		endOfStream := false
 		for vorbis.AnalysisBlockout(&encoder.vorbis.dspState, &encoder.vorbis.block) != 0 {
@@ -209,24 +228,33 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 
 			var packet vorbis.OggPacket
 
-			for vorbis.BitrateFlushpacket(&encoder.vorbis.dspState, &packet) != 0 {
+			for {
+				if vorbis.BitrateFlushpacket(&encoder.vorbis.dspState, &packet) != 0 {
+					log.Debug("Bitrate flush returns non-zero")
+					break
+				}
 				vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &packet)
 				for endOfStream == false {
 					var page vorbis.OggPage
 
 					if vorbis.OggStreamFlush(&encoder.vorbis.streamState, &page) == 0 {
+						log.Debug("OggStreamFlush returns 0")
 						break
 					}
 
 					ninjamPacket = append(ninjamPacket, page.Header...)
 					ninjamPacket = append(ninjamPacket, page.Body...)
 
+					log.Debug("Appended %v bytes to packet", len(page.Header) + len(page.Body))
+
 					if vorbis.OggPageEos(&page) != 0 {
+						log.Debug("Reached end of Ogg stream")
 						endOfStream = true
 					}
 				}
 			}
 		}
+		log.Debugf("Final packet length: %v bytes", len(ninjamPacket))
 
 		// store our new packet
 		res[p] = ninjamPacket
@@ -234,6 +262,12 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 
 	// finalize and close the encoder
 	encoder.clearVorbisHeaders()
+
+	log.Debugf("Encoding complete")
+	log.Debugf("Number of packets produced: %v", len(res))
+	for i := 0; i < len(res); i++ {
+		log.Debugf("Length of packet %v: %v bytes", i, len(res[i]))
+	}
 
 	// return result
 	return res, nil
