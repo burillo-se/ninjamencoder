@@ -162,9 +162,15 @@ func (encoder *Encoder) clearVorbisHeaders() {
 
 // EncodeNinjamInterval will accept an array of (interleaved) samples.
 // Returns an array of arrays of bytes, one array per each packet generated.
-func (encoder *Encoder) EncodeNinjamInterval(samples []float32) [][]byte {
+func (encoder *Encoder) EncodeNinjamInterval(samples []float32) ([][]byte, error) {
 	first := true
 	bufLen := len(samples) / encoder.ChannelCount
+	// validate len
+	if len(samples) != (encoder.ChannelCount * bufLen) {
+		return nil, fmt.Errorf("Invalid length of samples[]")
+	}
+
+	// length is valid, proceed
 	extra := (bufLen % encoder.ChunkSize) > 0
 	nPackets := bufLen / encoder.ChunkSize
 	if extra {
@@ -223,5 +229,5 @@ func (encoder *Encoder) EncodeNinjamInterval(samples []float32) [][]byte {
 	encoder.clearVorbisHeaders()
 
 	// return result
-	return res
+	return res, nil
 }
