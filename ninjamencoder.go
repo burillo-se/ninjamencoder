@@ -92,19 +92,17 @@ func getSamplePtr(data **float32, channelIndex int, sampleIndex int) *float32 {
 	return (*float32)(samplePtr)
 }
 
-func (encoder *Encoder) analyzeSamples(samples []float32) {
+func (encoder *Encoder) analyzeSamples(samples [][]float32) {
 	// vorbis analysis buffer is managed by vorbis library
-	nFrames := len(samples) / encoder.ChannelCount
+	nFrames := len(samples[0])
 
 	res := vorbis.AnalysisBuffer(&encoder.vorbis.dspState, int32(nFrames))
 
 	for i := 0; i < nFrames; i++ {
 		for c := 0; c < encoder.ChannelCount; c++ {
-			sampleIndex := i*encoder.ChannelCount + c
-
 			// get a ptr to sample value, and write it
 			samplePtr := getSamplePtr(res, c, i)
-			*samplePtr = samples[sampleIndex]
+			*samplePtr = samples[c][i]
 		}
 	}
 
@@ -160,17 +158,22 @@ func (encoder *Encoder) clearVorbisHeaders() {
 	vorbis.InfoClear(&encoder.vorbis.info)
 }
 
-// EncodeNinjamInterval will accept an array of (interleaved) samples.
+// EncodeNinjamInterval will accept deinterleaved samples.
 // Returns an array of arrays of bytes, one array per each packet generated.
-func (encoder *Encoder) EncodeNinjamInterval(samples []float32) ([][]byte, error) {
-	first := true
-	bufLen := len(samples) / encoder.ChannelCount
+func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, error) {
 	// validate len
-	if len(samples) != (encoder.ChannelCount * bufLen) {
-		return nil, fmt.Errorf("Invalid length of samples[]")
+	if len(samples) == 0 || len(samples) != encoder.ChannelCount {
+		return nil, fmt.Errorf("Invalid length of samples[][]")
 	}
 
-	// length is valid, proceed
+	bufLen := len(samples[0])
+	for i := 0; i < len(samples); i++ {
+		if bufLen != len(samples[i]) {
+			return nil, fmt.Errorf("Lengths of samples[] mismatch")
+		}
+	}
+
+	// lengths are valid, proceed
 	extra := (bufLen % encoder.ChunkSize) > 0
 	nPackets := bufLen / encoder.ChunkSize
 	if extra {
@@ -179,6 +182,7 @@ func (encoder *Encoder) EncodeNinjamInterval(samples []float32) ([][]byte, error
 
 	res := make([][]byte, nPackets)
 
+	first := true
 	for p := 0; p < nPackets; p++ {
 		var ninjamPacket []byte
 
@@ -189,10 +193,13 @@ func (encoder *Encoder) EncodeNinjamInterval(samples []float32) ([][]byte, error
 		}
 
 		// deinterleave and analyze samples
-		samplesPerChunk := encoder.ChannelCount * encoder.ChunkSize
-		start := p * samplesPerChunk
-		end := intmin(len(samples), (p+1)*samplesPerChunk)
-		encoder.analyzeSamples(samples[start:end])
+		start := p * encoder.ChunkSize
+		end := intmin(bufLen, (p + 1) * encoder.ChunkSize)
+		buf := make([][]float32, encoder.ChannelCount)
+		for c := 0; c < encoder.ChannelCount; c++ {
+			buf[c] = samples[c][start:end]
+		}
+		encoder.analyzeSamples(buf)
 
 		// encode our samples
 		endOfStream := false
