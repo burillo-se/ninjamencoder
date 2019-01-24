@@ -2,7 +2,7 @@ package ninjamencoder
 
 import (
 	"unsafe"
-
+	"reflect"
 	"fmt"
 
 	"github.com/xlab/vorbis-go/vorbis"
@@ -175,17 +175,25 @@ func (encoder *Encoder) initVorbisHeaders() ([]byte, error) {
 	}
 
 	for {
-		var page vorbis.OggPage
+		page := vorbis.OggPage{}
 		result := vorbis.OggStreamFlush(&encoder.vorbis.streamState, &page)
 		if result == 0 {
 			log.Debug("Stream write complete")
 			break
 		}
+		// ensure that page data is in sync with its C counterpart
+		page.Deref()
+		// modify slice length to be equal to one we expect
+		hPtr := (*reflect.SliceHeader)(unsafe.Pointer(&page.Header))
+		hPtr.Len = page.HeaderLen
+		bPtr := (*reflect.SliceHeader)(unsafe.Pointer(&page.Body))
+		bPtr.Len = page.BodyLen
+
 		headers = append(headers, page.Header...)
 		headers = append(headers, page.Body...)
 
 		log.Debugf("Appending %v bytes to headers", len(page.Header) + len(page.Body))
-		log.Debugf("Page contents: %v", page)
+		log.Tracef("Page contents: %v", page)
 	}
 
 	return headers, nil
@@ -280,11 +288,19 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 						break
 					}
 
+					// ensure that page data is in sync with its C counterpart
+					page.Deref()
+					// modify slice length to be equal to one we expect
+					hPtr := (*reflect.SliceHeader)(unsafe.Pointer(&page.Header))
+					hPtr.Len = page.HeaderLen
+					bPtr := (*reflect.SliceHeader)(unsafe.Pointer(&page.Body))
+					bPtr.Len = page.BodyLen
+
 					ninjamPacket = append(ninjamPacket, page.Header...)
 					ninjamPacket = append(ninjamPacket, page.Body...)
 
 					log.Debugf("Appended %v bytes to packet", len(page.Header) + len(page.Body))
-					log.Debugf("Written page: %v", page)
+					log.Tracef("Page contents: %v", page)
 
 					if vorbis.OggPageEos(&page) != 0 {
 						log.Debug("Reached end of Ogg stream")
