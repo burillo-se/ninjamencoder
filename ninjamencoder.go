@@ -256,15 +256,19 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 
 		// encode our samples
 		endOfStream := false
-		for vorbis.AnalysisBlockout(&encoder.vorbis.dspState, &encoder.vorbis.block) != 0 {
+		for {
+			if vorbis.AnalysisBlockout(&encoder.vorbis.dspState, &encoder.vorbis.block) != 1 {
+				log.Debug("AnalysisBlockout returned value other than 1")
+				break
+			}
 			vorbis.Analysis(&encoder.vorbis.block, nil)
 			vorbis.BitrateAddblock(&encoder.vorbis.block)
 
 			var packet vorbis.OggPacket
 
 			for {
-				if vorbis.BitrateFlushpacket(&encoder.vorbis.dspState, &packet) != 0 {
-					log.Debug("Bitrate flush returns non-zero")
+				if vorbis.BitrateFlushpacket(&encoder.vorbis.dspState, &packet) == 0 {
+					log.Debug("Bitrate flush returned zero")
 					break
 				}
 				vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &packet)
@@ -279,7 +283,8 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 					ninjamPacket = append(ninjamPacket, page.Header...)
 					ninjamPacket = append(ninjamPacket, page.Body...)
 
-					log.Debug("Appended %v bytes to packet", len(page.Header) + len(page.Body))
+					log.Debugf("Appended %v bytes to packet", len(page.Header) + len(page.Body))
+					log.Debugf("Written page: %v", page)
 
 					if vorbis.OggPageEos(&page) != 0 {
 						log.Debug("Reached end of Ogg stream")
