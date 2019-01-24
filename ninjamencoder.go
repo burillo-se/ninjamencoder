@@ -160,6 +160,10 @@ func (encoder *Encoder) initVorbisHeaders() ([]byte, error) {
 	headerComm := make([]vorbis.OggPacket, 1)
 	headerCode := make([]vorbis.OggPacket, 1)
 
+	defer header.Free()
+	defer headerComm[0].Free()
+	defer headerCode[0].Free()
+
 	ret = vorbis.AnalysisHeaderout(&encoder.vorbis.dspState, &encoder.vorbis.comment,
 		&header, headerComm, headerCode)
 	if ret != 0 {
@@ -181,6 +185,7 @@ func (encoder *Encoder) initVorbisHeaders() ([]byte, error) {
 
 	for {
 		page := vorbis.OggPage{}
+		defer page.Free()
 		result := vorbis.OggStreamFlush(&encoder.vorbis.streamState, &page)
 		if result == 0 {
 			log.Debug("Stream write complete")
@@ -209,6 +214,12 @@ func (encoder *Encoder) clearVorbisHeaders() {
 	vorbis.DspClear(&encoder.vorbis.dspState)
 	vorbis.CommentClear(&encoder.vorbis.comment)
 	vorbis.InfoClear(&encoder.vorbis.info)
+
+	encoder.vorbis.streamState.Free()
+	encoder.vorbis.block.Free()
+	encoder.vorbis.dspState.Free()
+	encoder.vorbis.comment.Free()
+	encoder.vorbis.info.Free()
 }
 
 // EncodeNinjamInterval will accept deinterleaved samples.
@@ -276,6 +287,7 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 			vorbis.BitrateAddblock(&encoder.vorbis.block)
 
 			var packet vorbis.OggPacket
+			defer packet.Free()
 
 			for {
 				if vorbis.BitrateFlushpacket(&encoder.vorbis.dspState, &packet) == 0 {
@@ -285,6 +297,7 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 				vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &packet)
 				for endOfStream == false {
 					var page vorbis.OggPage
+					defer page.Free()
 
 					if vorbis.OggStreamFlush(&encoder.vorbis.streamState, &page) == 0 {
 						log.Debug("OggStreamFlush returns 0")
