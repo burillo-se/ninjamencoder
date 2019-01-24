@@ -120,35 +120,59 @@ func (encoder *Encoder) analyzeSamples(samples [][]float32) {
 	vorbis.AnalysisWrote(&encoder.vorbis.dspState, int32(nFrames))
 }
 
-func (encoder *Encoder) initVorbisHeaders() []byte {
+func (encoder *Encoder) initVorbisHeaders() ([]byte, error) {
 	var headers []byte
 
 	log.Debug("Initializing vorbis headers")
 
 	vorbis.InfoInit(&encoder.vorbis.info)
-	vorbis.EncodeInitVbr(&encoder.vorbis.info,
+	ret := vorbis.EncodeInitVbr(&encoder.vorbis.info,
 		encoder.ChannelCount,
 		encoder.SampleRate,
 		encoder.Quality)
+	if ret != 0 {
+		return nil, fmt.Errorf("EncodeInitVbr returned %v", ret)
+	}
 
 	vorbis.CommentInit(&encoder.vorbis.comment)
-	vorbis.CommentAddTag(&encoder.vorbis.comment, "Encoder", "guitar-jam.ru")
+	vorbis.CommentAddTag(&encoder.vorbis.comment, "Encoder", "burillo-se/ninjamencoder")
 
-	vorbis.AnalysisInit(&encoder.vorbis.dspState, &encoder.vorbis.info)
-	vorbis.BlockInit(&encoder.vorbis.dspState, &encoder.vorbis.block)
+	ret = vorbis.AnalysisInit(&encoder.vorbis.dspState, &encoder.vorbis.info)
+	if ret != 0 {
+		return nil, fmt.Errorf("AnalysisInit returned %v", ret)
+	}
+	ret = vorbis.BlockInit(&encoder.vorbis.dspState, &encoder.vorbis.block)
+	if ret != 0 {
+		return nil, fmt.Errorf("BlockInit returned %v", ret)
+	}
 
-	vorbis.OggStreamInit(&encoder.vorbis.streamState, 0)
+	ret = vorbis.OggStreamInit(&encoder.vorbis.streamState, 0)
+	if ret != 0 {
+		return nil, fmt.Errorf("OggStreamInit returned %v", ret)
+	}
 
 	var header vorbis.OggPacket
 	headerComm := make([]vorbis.OggPacket, 1)
 	headerCode := make([]vorbis.OggPacket, 1)
 
-	vorbis.AnalysisHeaderout(&encoder.vorbis.dspState, &encoder.vorbis.comment,
+	ret = vorbis.AnalysisHeaderout(&encoder.vorbis.dspState, &encoder.vorbis.comment,
 		&header, headerComm, headerCode)
+	if ret != 0 {
+		return nil, fmt.Errorf("AnalysisHeaderout returned %v", ret)
+	}
 
-	vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &header)
-	vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerComm[0])
-	vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerCode[0])
+	ret = vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &header)
+	if ret != 0 {
+		return nil, fmt.Errorf("OggStreamPacketin(&header) returned %v", ret)
+	}
+	ret = vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerComm[0])
+	if ret != 0 {
+		return nil, fmt.Errorf("OggStreamPacketin(&headerComm[0]) returned %v", ret)
+	}
+	ret = vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerCode[0])
+	if ret != 0 {
+		return nil, fmt.Errorf("OggStreamPacketin(&headerCode[0]) returned %v", ret)
+	}
 
 	for {
 		var page vorbis.OggPage
@@ -161,9 +185,10 @@ func (encoder *Encoder) initVorbisHeaders() []byte {
 		headers = append(headers, page.Body...)
 
 		log.Debugf("Appending %v bytes to headers", len(page.Header) + len(page.Body))
+		log.Debugf("Page contents: %v", page)
 	}
 
-	return headers
+	return headers, nil
 }
 
 func (encoder *Encoder) clearVorbisHeaders() {
@@ -208,7 +233,11 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 		// if this is our first packet, initialize vorbis headers
 		if first {
 			log.Debug("First packet")
-			ninjamPacket = encoder.initVorbisHeaders()
+			ninjamPacket, err := encoder.initVorbisHeaders()
+			if err != nil {
+				log.Debug("Could not init vorbis headers")
+				return nil, fmt.Errorf("Coult not init vorbis headers")
+			}
 			log.Debugf("Appended %v bytes to packet", len(ninjamPacket))
 			first = false
 		}
