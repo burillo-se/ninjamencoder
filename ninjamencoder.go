@@ -1,3 +1,5 @@
+//build -gcflags '-N -l'
+
 package ninjamencoder
 
 import (
