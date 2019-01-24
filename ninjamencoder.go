@@ -50,6 +50,10 @@ func intmin(a int, b int) int {
 	return b
 }
 
+func SetLogLevel(level logrus.Level) {
+	log.SetLevel(level)
+}
+
 func DeinterleaveSamples(samples []float32, channelCount int) ([][]float32, error) {
 	nFrames := len(samples) / channelCount
 
