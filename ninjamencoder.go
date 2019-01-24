@@ -249,6 +249,7 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 		for c := 0; c < encoder.ChannelCount; c++ {
 			buf[c] = samples[c][start:end]
 		}
+		log.Debugf("Analysing %v samples [%v:%v]", end - start, start, end)
 		encoder.analyzeSamples(buf)
 
 		log.Debug("Analysis complete, encoding stream")
