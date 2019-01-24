@@ -261,7 +261,8 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 		// if this is our first packet, initialize vorbis headers
 		if first {
 			log.Debug("First packet")
-			ninjamPacket, err := encoder.initVorbisHeaders()
+			var err error
+			ninjamPacket, err = encoder.initVorbisHeaders()
 			if err != nil {
 				log.Debug("Could not init vorbis headers")
 				return nil, fmt.Errorf("Coult not init vorbis headers")
