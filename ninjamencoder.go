@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"fmt"
 
-	"github.com/xlab/vorbis-go/vorbis"
+	"github.com/burillo-se/vorbis-go/vorbis"
 
 	logrus "github.com/sirupsen/logrus"
 )
@@ -158,16 +158,16 @@ func (encoder *Encoder) initVorbisHeaders() ([]byte, error) {
 		return nil, fmt.Errorf("OggStreamInit returned %v", ret)
 	}
 
-	var header vorbis.OggPacket
-	headerComm := make([]vorbis.OggPacket, 1)
-	headerCode := make([]vorbis.OggPacket, 1)
+	header := vorbis.OggPacket{}
+	headerComm := vorbis.OggPacket{}
+	headerCode := vorbis.OggPacket{}
 
 	defer header.Free()
-	defer headerComm[0].Free()
-	defer headerCode[0].Free()
+	defer headerComm.Free()
+	defer headerCode.Free()
 
 	ret = vorbis.AnalysisHeaderout(&encoder.vorbis.dspState, &encoder.vorbis.comment,
-		&header, headerComm, headerCode)
+		&header, &headerComm, &headerCode)
 	if ret != 0 {
 		return nil, fmt.Errorf("AnalysisHeaderout returned %v", ret)
 	}
@@ -176,11 +176,11 @@ func (encoder *Encoder) initVorbisHeaders() ([]byte, error) {
 	if ret != 0 {
 		return nil, fmt.Errorf("OggStreamPacketin(&header) returned %v", ret)
 	}
-	ret = vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerComm[0])
+	ret = vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerComm)
 	if ret != 0 {
 		return nil, fmt.Errorf("OggStreamPacketin(&headerComm[0]) returned %v", ret)
 	}
-	ret = vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerCode[0])
+	ret = vorbis.OggStreamPacketin(&encoder.vorbis.streamState, &headerCode)
 	if ret != 0 {
 		return nil, fmt.Errorf("OggStreamPacketin(&headerCode[0]) returned %v", ret)
 	}
