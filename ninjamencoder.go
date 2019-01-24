@@ -199,7 +199,7 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 	for p := 0; p < nPackets; p++ {
 		var ninjamPacket []byte
 
-		log.Debug("Creating Ogg packet %v", p)
+		log.Debugf("Creating Ogg packet %v", p)
 
 		// if this is our first packet, initialize vorbis headers
 		if first {
