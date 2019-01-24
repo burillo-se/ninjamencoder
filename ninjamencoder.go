@@ -239,7 +239,8 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 
 	// lengths are valid, proceed
 	extra := (bufLen % encoder.ChunkSize) > 0
-	nPackets := bufLen / encoder.ChunkSize
+	// we write empty page at the end
+	nPackets := bufLen / encoder.ChunkSize + 1
 	if extra {
 		nPackets += 1
 	}
@@ -247,6 +248,7 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 	res := make([][]byte, nPackets)
 
 	first := true
+	last := false
 	for p := 0; p < nPackets; p++ {
 		var ninjamPacket []byte
 
@@ -264,17 +266,25 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 			first = false
 		}
 
-		// deinterleave and analyze samples
-		start := p * encoder.ChunkSize
-		end := intmin(bufLen, (p + 1) * encoder.ChunkSize)
-		buf := make([][]float32, encoder.ChannelCount)
-		for c := 0; c < encoder.ChannelCount; c++ {
-			buf[c] = samples[c][start:end]
-		}
-		log.Debugf("Analysing %v frames [%v:%v]", end - start, start, end)
-		encoder.analyzeSamples(buf)
+		last = p == (nPackets - 1)
 
-		log.Debug("Analysis complete, encoding stream")
+		if !last {
+			// deinterleave and analyze samples
+			start := p * encoder.ChunkSize
+			end := intmin(bufLen, (p + 1) * encoder.ChunkSize)
+			buf := make([][]float32, encoder.ChannelCount)
+			for c := 0; c < encoder.ChannelCount; c++ {
+				buf[c] = samples[c][start:end]
+			}
+			log.Debugf("Analysing %v frames [%v:%v]", end - start, start, end)
+			encoder.analyzeSamples(buf)
+
+			log.Debug("Analysis complete, encoding stream")
+		} else {
+			// indicate end of stream
+			vorbis.AnalysisWrote(&encoder.vorbis.dspState, 0)
+			log.Debug("Ending stream")
+		}
 
 		// encode our samples
 		endOfStream := false
@@ -286,10 +296,10 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 			vorbis.Analysis(&encoder.vorbis.block, nil)
 			vorbis.BitrateAddblock(&encoder.vorbis.block)
 
-			var packet vorbis.OggPacket
-			defer packet.Free()
-
 			for {
+				var packet vorbis.OggPacket
+				defer packet.Free()
+
 				if vorbis.BitrateFlushpacket(&encoder.vorbis.dspState, &packet) == 0 {
 					log.Debug("Bitrate flush returned zero")
 					break
