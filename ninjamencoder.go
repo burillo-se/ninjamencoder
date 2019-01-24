@@ -120,6 +120,11 @@ func (encoder *Encoder) analyzeSamples(samples [][]float32) {
 	vorbis.AnalysisWrote(&encoder.vorbis.dspState, int32(nFrames))
 }
 
+func resizeByteSlice(slice *[]byte, sliceLen int) {
+	sPtr := (*reflect.SliceHeader)(unsafe.Pointer(slice))
+	sPtr.Len = sliceLen
+}
+
 func (encoder *Encoder) initVorbisHeaders() ([]byte, error) {
 	var headers []byte
 
@@ -184,10 +189,8 @@ func (encoder *Encoder) initVorbisHeaders() ([]byte, error) {
 		// ensure that page data is in sync with its C counterpart
 		page.Deref()
 		// modify slice length to be equal to one we expect
-		hPtr := (*reflect.SliceHeader)(unsafe.Pointer(&page.Header))
-		hPtr.Len = page.HeaderLen
-		bPtr := (*reflect.SliceHeader)(unsafe.Pointer(&page.Body))
-		bPtr.Len = page.BodyLen
+		resizeByteSlice(&page.Header, page.HeaderLen)
+		resizeByteSlice(&page.Body, page.BodyLen)
 
 		headers = append(headers, page.Header...)
 		headers = append(headers, page.Body...)
@@ -257,7 +260,7 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 		for c := 0; c < encoder.ChannelCount; c++ {
 			buf[c] = samples[c][start:end]
 		}
-		log.Debugf("Analysing %v samples [%v:%v]", end - start, start, end)
+		log.Debugf("Analysing %v frames [%v:%v]", end - start, start, end)
 		encoder.analyzeSamples(buf)
 
 		log.Debug("Analysis complete, encoding stream")
@@ -291,10 +294,8 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 					// ensure that page data is in sync with its C counterpart
 					page.Deref()
 					// modify slice length to be equal to one we expect
-					hPtr := (*reflect.SliceHeader)(unsafe.Pointer(&page.Header))
-					hPtr.Len = page.HeaderLen
-					bPtr := (*reflect.SliceHeader)(unsafe.Pointer(&page.Body))
-					bPtr.Len = page.BodyLen
+					resizeByteSlice(&page.Header, page.HeaderLen)
+					resizeByteSlice(&page.Body, page.BodyLen)
 
 					ninjamPacket = append(ninjamPacket, page.Header...)
 					ninjamPacket = append(ninjamPacket, page.Body...)
