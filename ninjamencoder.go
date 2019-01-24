@@ -52,10 +52,12 @@ func intmin(a int, b int) int {
 	return b
 }
 
+// SetLogLevel sets logrus log level
 func SetLogLevel(level logrus.Level) {
 	log.SetLevel(level)
 }
 
+// DeinterleaveSamples deinterleaves samples (duh!)
 func DeinterleaveSamples(samples []float32, channelCount int) ([][]float32, error) {
 	nFrames := len(samples) / channelCount
 
@@ -242,9 +244,9 @@ func (encoder *Encoder) EncodeNinjamInterval(samples [][]float32) ([][]byte, err
 	// lengths are valid, proceed
 	extra := (bufLen % encoder.ChunkSize) > 0
 	// we write empty page at the end
-	nPackets := bufLen / encoder.ChunkSize + 1
-	if extra {
-		nPackets += 1
+	nPackets := bufLen/encoder.ChunkSize + 1
+	if extra && bufLen > 0 {
+		nPackets++
 	}
 
 	res := make([][]byte, nPackets)
