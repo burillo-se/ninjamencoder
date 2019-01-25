@@ -1,5 +1,3 @@
-//build -gcflags '-N -l'
-
 package ninjamencoder
 
 import (
@@ -144,7 +142,7 @@ func (encoder *Encoder) initVorbisHeaders() ([]byte, error) {
 	}
 
 	vorbis.CommentInit(&encoder.vorbis.comment)
-	vorbis.CommentAddTag(&encoder.vorbis.comment, "Encoder", "burillo-se/ninjamencoder")
+	vorbis.CommentAddTag(&encoder.vorbis.comment, "Encoder\x00", "burillo-se/ninjamencoder\x00")
 
 	ret = vorbis.AnalysisInit(&encoder.vorbis.dspState, &encoder.vorbis.info)
 	if ret != 0 {
