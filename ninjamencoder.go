@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"fmt"
 
-	"github.com/burillo-se/vorbis-go/vorbis"
+	"github.com/xlab/vorbis-go/vorbis"
 
 	logrus "github.com/sirupsen/logrus"
 )
