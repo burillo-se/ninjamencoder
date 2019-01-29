@@ -116,9 +116,10 @@ func InterleaveSamples(samples [][]float32) ([]float32, error) {
 		}
 	}
 	result := make([]float32, nFrames)
+	nChannels := len(samples)
 	for c, cb := range samples {
 		for s, sv := range cb {
-			idx := s*c + c
+			idx := s*nChannels + c
 			result[idx] = sv
 		}
 	}
@@ -141,9 +142,10 @@ func InterleaveSamplesInPlace(samples [][]float32, buf []float32) error {
 	if len(buf) != nFrames*len(samples) {
 		return fmt.Errorf("Invalie number of samples in buffer")
 	}
+	nChannels := len(samples)
 	for c, cb := range samples {
 		for s, sv := range cb {
-			idx := s*c + c
+			idx := s*nChannels + c
 			buf[idx] = sv
 		}
 	}
