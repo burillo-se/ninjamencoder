@@ -75,6 +75,28 @@ func DeinterleaveSamples(samples []float32, channelCount int) ([][]float32, erro
 	return res, nil
 }
 
+// InterleaveSamples interleaves samples (you don't say?!)
+func InterleaveSamples(samples [][]float32) ([]float32, error) {
+	if len(samples) == 0 {
+		return nil, fmt.Errorf("Invalid number of channels")
+	}
+	nFrames := len(samples[0])
+	for _, s := range samples {
+		if len(s) != nFrames {
+			return nil, fmt.Errorf("Per-channel sample count mismatch")
+		}
+	}
+	result := make([]float32, nFrames)
+	for c, cb := range samples {
+		for s, sv := range cb {
+			idx := s*c + c
+			result[idx] = sv
+		}
+	}
+
+	return result, nil
+}
+
 // this is totally going to work, pinky swear
 func getSamplePtr(data **float32, channelIndex int, sampleIndex int) *float32 {
 	// &data[0]
