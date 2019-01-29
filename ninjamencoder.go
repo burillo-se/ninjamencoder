@@ -75,6 +75,35 @@ func DeinterleaveSamples(samples []float32, channelCount int) ([][]float32, erro
 	return res, nil
 }
 
+// DeinterleaveSamplesInPlace will deinterleave samples into an already
+// provided buffer
+func DeinterleaveSamplesInPlace(samples []float32, buf [][]float32) error {
+	if len(buf) == 0 {
+		return fmt.Errorf("Invalid channel count")
+	}
+	nFrames := len(samples) / len(buf)
+
+	if len(samples) != (nFrames * len(buf)) {
+		return fmt.Errorf("Invalid number of samples")
+	}
+	nSamples := len(samples) / len(buf)
+
+	for _, cb := range buf {
+		if len(cb) != nSamples {
+			return fmt.Errorf("Per-channel sample count mismatch")
+		}
+	}
+	nChannels := len(buf)
+
+	for c := 0; c < nChannels; c++ {
+		for f := 0; f < nFrames; f++ {
+			// not terribly cache efficient but oh well
+			buf[c][f] = samples[f*nChannels+c]
+		}
+	}
+	return nil
+}
+
 // InterleaveSamples interleaves samples (you don't say?!)
 func InterleaveSamples(samples [][]float32) ([]float32, error) {
 	if len(samples) == 0 {
@@ -95,6 +124,31 @@ func InterleaveSamples(samples [][]float32) ([]float32, error) {
 	}
 
 	return result, nil
+}
+
+// InterleaveSamplesInPlace interleaves samples into an already
+// provided buffer
+func InterleaveSamplesInPlace(samples [][]float32, buf []float32) error {
+	if len(samples) == 0 {
+		return fmt.Errorf("Invalid number of channels")
+	}
+	nFrames := len(samples[0])
+	for _, s := range samples {
+		if len(s) != nFrames {
+			return fmt.Errorf("Per-channel sample count mismatch")
+		}
+	}
+	if len(buf) != nFrames*len(samples) {
+		return fmt.Errorf("Invalie number of samples in buffer")
+	}
+	for c, cb := range samples {
+		for s, sv := range cb {
+			idx := s*c + c
+			buf[idx] = sv
+		}
+	}
+
+	return nil
 }
 
 // this is totally going to work, pinky swear
